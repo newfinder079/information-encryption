@@ -61,13 +61,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // 自定义字符编码 (Base64)
     function encodeCustom(uint8Array) {
         const chars = [];
-        let i = 0;
+        const len = uint8Array.length;
+        const padding = (3 - (len % 3)) % 3;  // 计算需要填充的字节数（0, 1, 或 2）
         
+        // 在开头添加填充信息（使用前3个字符表示0, 1, 2）
+        chars.push(CHAR_MAP[padding]);
+        
+        let i = 0;
         // 每3个字节编码为4个字符
-        while (i < uint8Array.length) {
+        while (i < len) {
             const b1 = uint8Array[i++];
-            const b2 = i < uint8Array.length ? uint8Array[i++] : 0;
-            const b3 = i < uint8Array.length ? uint8Array[i++] : 0;
+            const b2 = i < len ? uint8Array[i++] : 0;
+            const b3 = i < len ? uint8Array[i++] : 0;
             
             chars.push(
                 CHAR_MAP[b1 >> 2],
@@ -84,18 +89,30 @@ document.addEventListener('DOMContentLoaded', () => {
         // 过滤出有效字符
         const cleanStr = Array.from(str).filter(c => REVERSE_MAP[c] !== undefined).join('');
         
-        if (cleanStr.length % 4 !== 0) {
+        if (cleanStr.length < 1) {
+            throw new Error('密文为空');
+        }
+        
+        // 读取填充信息
+        const padding = REVERSE_MAP[cleanStr[0]];
+        if (padding > 2) {
+            throw new Error('密文格式错误');
+        }
+        
+        const dataStr = cleanStr.slice(1);  // 去除填充标记
+        
+        if (dataStr.length % 4 !== 0) {
             throw new Error('密文长度无效');
         }
         
         const bytes = [];
         
         // 每4个字符解码为3个字节
-        for (let i = 0; i < cleanStr.length; i += 4) {
-            const c1 = REVERSE_MAP[cleanStr[i]];
-            const c2 = REVERSE_MAP[cleanStr[i + 1]];
-            const c3 = REVERSE_MAP[cleanStr[i + 2]];
-            const c4 = REVERSE_MAP[cleanStr[i + 3]];
+        for (let i = 0; i < dataStr.length; i += 4) {
+            const c1 = REVERSE_MAP[dataStr[i]];
+            const c2 = REVERSE_MAP[dataStr[i + 1]];
+            const c3 = REVERSE_MAP[dataStr[i + 2]];
+            const c4 = REVERSE_MAP[dataStr[i + 3]];
             
             bytes.push(
                 (c1 << 2) | (c2 >> 4),
@@ -104,7 +121,9 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         }
         
-        return new Uint8Array(bytes);
+        // 去除填充的字节
+        const result = new Uint8Array(bytes);
+        return padding > 0 ? result.slice(0, -padding) : result;
     }
 
     // 密钥派生
