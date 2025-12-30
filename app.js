@@ -2,8 +2,18 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     // 常量定义
-    const CHAR_MAP = ['魑', '魅', '魍', '魉'];
-    const REVERSE_MAP = { '魑': 0, '魅': 1, '魍': 2, '魉': 3 };
+    const CHAR_MAP = [
+        '魑', '魅', '魍', '魉', '魃', '魈', '魁', '鬾',
+        '魆', '魊', '魋', '魌', '魐', '魒', '魓', '魕',
+        '龙', '凤', '麒', '麟', '鲲', '鹏', '貔', '貅',
+        '饕', '餮', '梼', '杌', '穷', '奇', '混', '沌',
+        '烛', '九', '阴', '白', '泽', '夔', '獬', '豸',
+        '天', '狗', '毕', '方', '腾', '蛇', '应', '龙',
+        '狴', '犴', '螭', '吻', '朝', '天', '睚', '眦',
+        '嘲', '风', '蒲', '牢', '狻', '猊', '赑', '屃'
+    ];
+    const REVERSE_MAP = {};
+    CHAR_MAP.forEach((char, index) => { REVERSE_MAP[char] = index; });
     const SALT_LENGTH = 16;
     const IV_LENGTH = 12;
     const ITERATIONS_BYTES = 4;
@@ -23,8 +33,15 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // 事件监听
-    document.getElementById('btnEncrypt').addEventListener('click', encrypt);
-    document.getElementById('btnDecrypt').addEventListener('click', decrypt);
+    console.log('加密工具已加载');
+    document.getElementById('btnEncrypt').addEventListener('click', () => {
+        console.log('加密按钮被点击');
+        encrypt();
+    });
+    document.getElementById('btnDecrypt').addEventListener('click', () => {
+        console.log('解密按钮被点击');
+        decrypt();
+    });
     document.getElementById('btnEncClear').addEventListener('click', () => {
         elements.plainIn.value = '';
         elements.cipherOut.value = '';
@@ -36,40 +53,58 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.passDec.value = '';
     });
     document.getElementById('btnCopyCipher').addEventListener('click', copyCipherText);
-    document.getElementById('btnSelfTest').addEventListener('click', selfTest);
+    document.getElementById('btnSelfTest').addEventListener('click', () => {
+        console.log('自检按钮被点击');
+        selfTest();
+    });
 
-    // 自定义字符编码 (Base4)
+    // 自定义字符编码 (Base64)
     function encodeCustom(uint8Array) {
         const chars = [];
-        for (const byte of uint8Array) {
+        let i = 0;
+        
+        // 每3个字节编码为4个字符
+        while (i < uint8Array.length) {
+            const b1 = uint8Array[i++];
+            const b2 = i < uint8Array.length ? uint8Array[i++] : 0;
+            const b3 = i < uint8Array.length ? uint8Array[i++] : 0;
+            
             chars.push(
-                CHAR_MAP[(byte >> 6) & 0x03],
-                CHAR_MAP[(byte >> 4) & 0x03],
-                CHAR_MAP[(byte >> 2) & 0x03],
-                CHAR_MAP[byte & 0x03]
+                CHAR_MAP[b1 >> 2],
+                CHAR_MAP[((b1 & 0x03) << 4) | (b2 >> 4)],
+                CHAR_MAP[((b2 & 0x0F) << 2) | (b3 >> 6)],
+                CHAR_MAP[b3 & 0x3F]
             );
         }
+        
         return chars.join('');
     }
 
     function decodeCustom(str) {
-        const cleanStr = str.replace(/[^魑魅魍魉]/g, '');
+        // 过滤出有效字符
+        const cleanStr = Array.from(str).filter(c => REVERSE_MAP[c] !== undefined).join('');
+        
         if (cleanStr.length % 4 !== 0) {
             throw new Error('密文长度无效');
         }
         
-        const len = cleanStr.length / 4;
-        const uint8Array = new Uint8Array(len);
+        const bytes = [];
         
-        for (let i = 0; i < len; i++) {
-            const idx = i * 4;
-            const byte = (REVERSE_MAP[cleanStr[idx]] << 6) |
-                        (REVERSE_MAP[cleanStr[idx + 1]] << 4) |
-                        (REVERSE_MAP[cleanStr[idx + 2]] << 2) |
-                        REVERSE_MAP[cleanStr[idx + 3]];
-            uint8Array[i] = byte;
+        // 每4个字符解码为3个字节
+        for (let i = 0; i < cleanStr.length; i += 4) {
+            const c1 = REVERSE_MAP[cleanStr[i]];
+            const c2 = REVERSE_MAP[cleanStr[i + 1]];
+            const c3 = REVERSE_MAP[cleanStr[i + 2]];
+            const c4 = REVERSE_MAP[cleanStr[i + 3]];
+            
+            bytes.push(
+                (c1 << 2) | (c2 >> 4),
+                ((c2 & 0x0F) << 4) | (c3 >> 2),
+                ((c3 & 0x03) << 6) | c4
+            );
         }
-        return uint8Array;
+        
+        return new Uint8Array(bytes);
     }
 
     // 密钥派生
