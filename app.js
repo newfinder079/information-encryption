@@ -1,34 +1,55 @@
 // app.js
 
 document.addEventListener('DOMContentLoaded', () => {
-    const btnEncrypt = document.getElementById('btnEncrypt');
-    const btnDecrypt = document.getElementById('btnDecrypt');
-    const btnEncClear = document.getElementById('btnEncClear');
-    const btnDecClear = document.getElementById('btnDecClear');
-    const btnCopyCipher = document.getElementById('btnCopyCipher');
-    const btnSelfTest = document.getElementById('btnSelfTest');
-
-    btnEncrypt.addEventListener('click', encrypt);
-    btnDecrypt.addEventListener('click', decrypt);
-    btnEncClear.addEventListener('click', clearEncryptFields);
-    btnDecClear.addEventListener('click', clearDecryptFields);
-    btnCopyCipher.addEventListener('click', copyCipherText);
-    btnSelfTest.addEventListener('click', selfTest);
-
+    // 常量定义
     const CHAR_MAP = ['魑', '魅', '魍', '魉'];
     const REVERSE_MAP = { '魑': 0, '魅': 1, '魍': 2, '魉': 3 };
+    const SALT_LENGTH = 16;
+    const IV_LENGTH = 12;
+    const ITERATIONS_BYTES = 4;
+    const ENCODER = new TextEncoder();
+    const DECODER = new TextDecoder();
+    
+    // DOM 元素缓存
+    const elements = {
+        plainIn: document.getElementById('plainIn'),
+        cipherOut: document.getElementById('cipherOut'),
+        passEnc: document.getElementById('passEnc'),
+        iterations: document.getElementById('iterations'),
+        cipherIn: document.getElementById('cipherIn'),
+        plainOut: document.getElementById('plainOut'),
+        passDec: document.getElementById('passDec'),
+        status: document.getElementById('status')
+    };
 
+    // 事件监听
+    document.getElementById('btnEncrypt').addEventListener('click', encrypt);
+    document.getElementById('btnDecrypt').addEventListener('click', decrypt);
+    document.getElementById('btnEncClear').addEventListener('click', () => {
+        elements.plainIn.value = '';
+        elements.cipherOut.value = '';
+        elements.passEnc.value = '';
+    });
+    document.getElementById('btnDecClear').addEventListener('click', () => {
+        elements.cipherIn.value = '';
+        elements.plainOut.value = '';
+        elements.passDec.value = '';
+    });
+    document.getElementById('btnCopyCipher').addEventListener('click', copyCipherText);
+    document.getElementById('btnSelfTest').addEventListener('click', selfTest);
+
+    // 自定义字符编码 (Base4)
     function encodeCustom(uint8Array) {
-        let result = '';
-        for (let i = 0; i < uint8Array.length; i++) {
-            const byte = uint8Array[i];
-            const b1 = (byte >> 6) & 0x03;
-            const b2 = (byte >> 4) & 0x03;
-            const b3 = (byte >> 2) & 0x03;
-            const b4 = byte & 0x03;
-            result += CHAR_MAP[b1] + CHAR_MAP[b2] + CHAR_MAP[b3] + CHAR_MAP[b4];
+        const chars = [];
+        for (const byte of uint8Array) {
+            chars.push(
+                CHAR_MAP[(byte >> 6) & 0x03],
+                CHAR_MAP[(byte >> 4) & 0x03],
+                CHAR_MAP[(byte >> 2) & 0x03],
+                CHAR_MAP[byte & 0x03]
+            );
         }
-        return result;
+        return chars.join('');
     }
 
     function decodeCustom(str) {
@@ -41,23 +62,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const uint8Array = new Uint8Array(len);
         
         for (let i = 0; i < len; i++) {
-            const c1 = REVERSE_MAP[cleanStr[i * 4]];
-            const c2 = REVERSE_MAP[cleanStr[i * 4 + 1]];
-            const c3 = REVERSE_MAP[cleanStr[i * 4 + 2]];
-            const c4 = REVERSE_MAP[cleanStr[i * 4 + 3]];
-            
-            const byte = (c1 << 6) | (c2 << 4) | (c3 << 2) | c4;
+            const idx = i * 4;
+            const byte = (REVERSE_MAP[cleanStr[idx]] << 6) |
+                        (REVERSE_MAP[cleanStr[idx + 1]] << 4) |
+                        (REVERSE_MAP[cleanStr[idx + 2]] << 2) |
+                        REVERSE_MAP[cleanStr[idx + 3]];
             uint8Array[i] = byte;
         }
         return uint8Array;
     }
 
-    // 将密码派生为密钥
+    // 密钥派生
     async function deriveKey(password, salt, iterations) {
-        const encoder = new TextEncoder();
         const passwordKey = await crypto.subtle.importKey(
             'raw',
-            encoder.encode(password),
+            ENCODER.encode(password),
             'PBKDF2',
             false,
             ['deriveKey']
@@ -66,8 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return crypto.subtle.deriveKey(
             {
                 name: 'PBKDF2',
-                salt: salt,
-                iterations: iterations,
+                salt,
+                iterations,
                 hash: 'SHA-256'
             },
             passwordKey,
@@ -77,171 +96,155 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
 
-    // 加密函数
+    // 加密
     async function encrypt() {
+        const plainText = elements.plainIn.value.trim();
+        const password = elements.passEnc.value;
+        const iterations = parseInt(elements.iterations.value, 10);
+
+        if (!plainText) {
+            return updateStatus('请输入要加密的明文！');
+        }
+        if (!password) {
+            return updateStatus('请输入口令！');
+        }
+        if (iterations < 10000) {
+            return updateStatus('迭代次数至少为 10000！');
+        }
+
         try {
-            const plainText = document.getElementById('plainIn').value;
-            const password = document.getElementById('passEnc').value;
-            const 自定义字符集
-            const cipherText = encodeCustom(result
-            if (!plainText) {
-                updateStatus('请输入要加密的明文！');
-                return;
-            }
-
-            if (!password) {
-                updateStatus('请输入口令！');
-                return;
-            }
-
             // 生成随机盐和IV
-            const salt = crypto.getRandomValues(new Uint8Array(16));
-            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+            const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
 
-            // 派生密钥
+            // 派生密钥并加密
             const key = await deriveKey(password, salt, iterations);
-
-            // 加密数据
-            const encoder = new TextEncoder();
             const encrypted = await crypto.subtle.encrypt(
-                { name: 'AES-GCM', iv: iv },
+                { name: 'AES-GCM', iv },
                 key,
-                encoder.encode(plainText)
+                ENCODER.encode(plainText)
             );
 
-            // 将迭代次数、盐、IV和密文组合在一起
-            const result = new Uint8Array(4 + salt.length + iv.length + encrypted.byteLength);
+            // 组合数据：迭代次数(4) + 盐(16) + IV(12) + 密文
+            const totalLength = ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH + encrypted.byteLength;
+            const result = new Uint8Array(totalLength);
             const view = new DataView(result.buffer);
             
-            // 前4字节存储迭代次数
             view.setUint32(0, iterations, false);
-            result.set(salt, 4);
-            result.set(iv, 4 + salt.length);
-            result.set(new Uint8Array(encrypted), 4 + salt.length + iv.length);
+            result.set(salt, ITERATIONS_BYTES);
+            result.set(iv, ITERATIONS_BYTES + SALT_LENGTH);
+            result.set(new Uint8Array(encrypted), ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH);
 
-            // 转换为Base64
-            const cipherText = btoa(String.fromCharCode(...result));
-            document.getElementById('cipherOut').value = cipherText;
+            // 转换为自定义字符集
+            elements.cipherOut.value = encodeCustom(result);
             updateStatus('加密成功！');
         } catch (error) {
             updateStatus(`加密失败：${error.message}`);
-            console.error(error);
+            console.error('Encryption error:', error);
         }
     }
 
-    // 解密函数
+    // 解密
     async function decrypt() {
+        const cipherText = elements.cipherIn.value.trim();
+        const password = elements.passDec.value;
+
+        if (!cipherText) {
+            return updateStatus('请输入要解密的密文！');
+        }
+        if (!password) {
+            return updateStatus('请输入口令！');
+        }
+
         try {
-            const cipherText = document.getElementById('cipherIn').value;
-            const password = document.getElementById('passDec').value;
-
-            if (!cipherText) {
-                updateStatus('请输入要解密的密文！');
-                return;
-            }
-
-            if (!password) {
-                updateStatus('请输入口令！');
-                return;
-            }
-
-            // 从自定义字符集解码
+            // 解码自定义字符集
             const data = decodeCustom(cipherText);
             
-            // 提取迭代次数、盐、IV和密文
+            // 检查数据长度
+            const minLength = ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH;
+            if (data.length < minLength) {
+                throw new Error('密文数据不完整');
+            }
+
+            // 提取数据
             const view = new DataView(data.buffer);
             const iterations = view.getUint32(0, false);
-            const salt = data.slice(4, 20);
-            const iv = data.slice(20, 32);
-            const encrypted = data.slice(32);
+            const salt = data.slice(ITERATIONS_BYTES, ITERATIONS_BYTES + SALT_LENGTH);
+            const iv = data.slice(ITERATIONS_BYTES + SALT_LENGTH, ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH);
+            const encrypted = data.slice(ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH);
 
-            // 派生密钥
+            // 派生密钥并解密
             const key = await deriveKey(password, salt, iterations);
-
-            // 解密数据
             const decrypted = await crypto.subtle.decrypt(
-                { name: 'AES-GCM', iv: iv },
+                { name: 'AES-GCM', iv },
                 key,
                 encrypted
             );
 
             // 转换为文本
-            const decoder = new TextDecoder();
-            const plainText = decoder.decode(decrypted);
-            document.getElementById('plainOut').value = plainText;
+            elements.plainOut.value = DECODER.decode(decrypted);
             updateStatus('解密成功！');
         } catch (error) {
-            updateStatus(`解密失败：口令错误或密文已损坏`);
-            console.error(error);
+            updateStatus('解密失败：口令错误或密文已损坏');
+            console.error('Decryption error:', error);
         }
     }
 
-    function clearEncryptFields() {
-        document.getElementById('plainIn').value = '';
-        document.getElementById('cipherOut').value = '';
-        document.getElementById('passEnc').value = '';
-    }
-
-    function clearDecryptFields() {
-        document.getElementById('cipherIn').value = '';
-        document.getElementById('plainOut').value = '';
-        document.getElementById('passDec').value = '';
-    }
-
+    // 复制密文
     async function copyCipherText() {
-        const cipherText = document.getElementById('cipherOut').value;
+        const cipherText = elements.cipherOut.value;
         
         if (!cipherText) {
-            updateStatus('没有可复制的密文！');
-            return;
+            return updateStatus('没有可复制的密文！');
         }
 
         try {
             await navigator.clipboard.writeText(cipherText);
             updateStatus('密文已复制到剪贴板！');
-        } catch (error) {
-            // 降级方案：使用旧方法
-            const textarea = document.getElementById('cipherOut');
-            textarea.select();
+        } catch {
+            // 降级方案
+            elements.cipherOut.select();
             try {
                 document.execCommand('copy');
                 updateStatus('密文已复制到剪贴板！');
-            } catch (e) {
+            } catch {
                 updateStatus('复制失败，请手动选择并复制');
             }
         }
     }
 
+    // 自检
     async function selfTest() {
+        const testText = '测试文本123ABC!@#\n多行测试';
+        const testPassword = '测试口令';
+        const testIterations = 100000;
+        
         try {
-            const testText = '测试文本123ABC!@#\n多行测试';
-            const testPassword = '测试口令';
-            const testIterations = 100000;
+            // 设置测试数据
+            elements.plainIn.value = testText;
+            elements.passEnc.value = testPassword;
+            elements.iterations.value = testIterations;
             
-            document.getElementById('plainIn').value = testText;
-            document.getElementById('passEnc').value = testPassword;
-            document.getElementById('iterations').value = testIterations;
-            
+            // 加密
             updateStatus('正在运行自检：加密中...');
             await encrypt();
+            await sleep(500);
             
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            const cipherText = document.getElementById('cipherOut').value;
+            const cipherText = elements.cipherOut.value;
             if (!cipherText) {
-                updateStatus('自检失败：加密未产生密文');
-                return;
+                return updateStatus('自检失败：加密未产生密文');
             }
             
-            document.getElementById('cipherIn').value = cipherText;
-            document.getElementById('passDec').value = testPassword;
+            // 解密
+            elements.cipherIn.value = cipherText;
+            elements.passDec.value = testPassword;
             
             updateStatus('正在运行自检：解密中...');
             await decrypt();
+            await sleep(500);
             
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            const decryptedText = document.getElementById('plainOut').value;
+            // 验证结果
+            const decryptedText = elements.plainOut.value;
             if (decryptedText === testText) {
                 updateStatus('✓ 自检通过！加密和解密功能正常工作。');
             } else {
@@ -249,11 +252,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             updateStatus(`自检失败：${error.message}`);
-            console.error(error);
+            console.error('Self-test error:', error);
         }
     }
 
+    // 工具函数
     function updateStatus(message) {
-        document.getElementById('status').textContent = message;
+        elements.status.textContent = message;
+    }
+
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 });
