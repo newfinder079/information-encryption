@@ -15,6 +15,43 @@ document.addEventListener('DOMContentLoaded', () => {
     btnCopyCipher.addEventListener('click', copyCipherText);
     btnSelfTest.addEventListener('click', selfTest);
 
+    const CHAR_MAP = ['魑', '魅', '魍', '魉'];
+    const REVERSE_MAP = { '魑': 0, '魅': 1, '魍': 2, '魉': 3 };
+
+    function encodeCustom(uint8Array) {
+        let result = '';
+        for (let i = 0; i < uint8Array.length; i++) {
+            const byte = uint8Array[i];
+            const b1 = (byte >> 6) & 0x03;
+            const b2 = (byte >> 4) & 0x03;
+            const b3 = (byte >> 2) & 0x03;
+            const b4 = byte & 0x03;
+            result += CHAR_MAP[b1] + CHAR_MAP[b2] + CHAR_MAP[b3] + CHAR_MAP[b4];
+        }
+        return result;
+    }
+
+    function decodeCustom(str) {
+        const cleanStr = str.replace(/[^魑魅魍魉]/g, '');
+        if (cleanStr.length % 4 !== 0) {
+            throw new Error('密文长度无效');
+        }
+        
+        const len = cleanStr.length / 4;
+        const uint8Array = new Uint8Array(len);
+        
+        for (let i = 0; i < len; i++) {
+            const c1 = REVERSE_MAP[cleanStr[i * 4]];
+            const c2 = REVERSE_MAP[cleanStr[i * 4 + 1]];
+            const c3 = REVERSE_MAP[cleanStr[i * 4 + 2]];
+            const c4 = REVERSE_MAP[cleanStr[i * 4 + 3]];
+            
+            const byte = (c1 << 6) | (c2 << 4) | (c3 << 2) | c4;
+            uint8Array[i] = byte;
+        }
+        return uint8Array;
+    }
+
     // 将密码派生为密钥
     async function deriveKey(password, salt, iterations) {
         const encoder = new TextEncoder();
@@ -45,8 +82,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const plainText = document.getElementById('plainIn').value;
             const password = document.getElementById('passEnc').value;
-            const iterations = parseInt(document.getElementById('iterations').value, 10);
-
+            const 自定义字符集
+            const cipherText = encodeCustom(result
             if (!plainText) {
                 updateStatus('请输入要加密的明文！');
                 return;
@@ -108,8 +145,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // 从Base64解码
-            const data = Uint8Array.from(atob(cipherText), c => c.charCodeAt(0));
+            // 从自定义字符集解码
+            const data = decodeCustom(cipherText);
             
             // 提取迭代次数、盐、IV和密文
             const view = new DataView(data.buffer);
