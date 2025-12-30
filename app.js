@@ -199,17 +199,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
+            // 显示过程
+            showProcessSection();
+            clearProcessSteps();
+            addProcessStep('📝 步骤 1: 读取输入', `明文长度: ${plainText.length} 字符\n迭代次数: ${iterations.toLocaleString()}`);
+            
             // 生成随机盐和IV
             const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+            addProcessStep('🎲 步骤 2: 生成随机盐', `盐值 (16字节): ${formatBytes(salt)}`);
+            
             const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
+            addProcessStep('🎲 步骤 3: 生成初始化向量', `IV (12字节): ${formatBytes(iv)}`);
 
             // 派生密钥并加密
+            addProcessStep('🔑 步骤 4: 密钥派生', `使用 PBKDF2-SHA256 从口令派生 AES-256 密钥...`);
             const key = await deriveKey(password, salt, iterations);
+            addProcessStep('✓ 密钥派生完成', `256位密钥已生成`, 'success');
+            
+            addProcessStep('🔐 步骤 5: AES-GCM 加密', `使用 AES-256-GCM 加密数据...`);
             const encrypted = await crypto.subtle.encrypt(
                 { name: 'AES-GCM', iv },
                 key,
                 ENCODER.encode(plainText)
             );
+            addProcessStep('✓ 加密完成', `密文长度: ${encrypted.byteLength} 字节`, 'success');
 
             // 组合数据：迭代次数(4) + 盐(16) + IV(12) + 密文
             const totalLength = ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH + encrypted.byteLength;
@@ -220,10 +233,15 @@ document.addEventListener('DOMContentLoaded', () => {
             result.set(salt, ITERATIONS_BYTES);
             result.set(iv, ITERATIONS_BYTES + SALT_LENGTH);
             result.set(new Uint8Array(encrypted), ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH);
+            
+            addProcessStep('📦 步骤 6: 组合数据', `迭代次数(4) + 盐(16) + IV(12) + 密文(${encrypted.byteLength})\n总计: ${totalLength} 字节`);
 
             // 转换为自定义字符集
+            addProcessStep('🔤 步骤 7: Base64编码', `将二进制数据编码为64个神兽汉字...`);
             const encoded = encodeCustom(result);
             console.log('加密完成，原始数据长度:', result.length, '编码后长度:', encoded.length);
+            addProcessStep('✓ 编码完成', `最终密文长度: ${encoded.length} 个字符`, 'success');
+            
             elements.cipherOut.value = encoded;
             updateStatus('加密成功！');
         } catch (error) {
@@ -245,10 +263,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
+            // 显示过程
+            showProcessSection();
+            clearProcessSteps();
+            addProcessStep('📝 步骤 1: 读取密文', `密文长度: ${cipherText.length} 个字符`);
+            
             // 解码自定义字符集
             console.log('开始解密，密文长度:', cipherText.length);
+            addProcessStep('🔤 步骤 2: Base64解码', `将神兽汉字解码为二进制数据...`);
             const data = decodeCustom(cipherText);
             console.log('解码后数据长度:', data.length);
+            addProcessStep('✓ 解码完成', `二进制数据: ${data.length} 字节`, 'success');
             
             // 检查数据长度
             const minLength = ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH;
@@ -257,6 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // 提取数据
+            addProcessStep('📦 步骤 3: 提取数据', `分离迭代次数、盐值、IV和密文...`);
             const view = new DataView(data.buffer);
             const iterations = view.getUint32(0, false);
             const salt = data.slice(ITERATIONS_BYTES, ITERATIONS_BYTES + SALT_LENGTH);
@@ -264,17 +290,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const encrypted = data.slice(ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH);
             
             console.log('迭代次数:', iterations, '盐长度:', salt.length, 'IV长度:', iv.length, '密文长度:', encrypted.length);
+            addProcessStep('✓ 数据提取完成', `迭代: ${iterations.toLocaleString()}\n盐: ${formatBytes(salt, 24)}\nIV: ${formatBytes(iv, 24)}\n密文: ${encrypted.length} 字节`, 'success');
 
             // 派生密钥并解密
+            addProcessStep('🔑 步骤 4: 密钥派生', `使用 PBKDF2-SHA256 从口令派生密钥...`);
             const key = await deriveKey(password, salt, iterations);
+            addProcessStep('✓ 密钥派生完成', `256位密钥已生成`, 'success');
+            
+            addProcessStep('🔓 步骤 5: AES-GCM 解密', `使用密钥和IV解密数据...`);
             const decrypted = await crypto.subtle.decrypt(
                 { name: 'AES-GCM', iv },
                 key,
                 encrypted
             );
+            addProcessStep('✓ 解密完成', `明文长度: ${decrypted.byteLength} 字节`, 'success');
 
             // 转换为文本
-            elements.plainOut.value = DECODER.decode(decrypted);
+            const plainText = DECODER.decode(decrypted);
+            addProcessStep('📄 步骤 6: 转换文本', `UTF-8解码: ${plainText.length} 个字符`, 'success');
+            
+            elements.plainOut.value = plainText;
             updateStatus('解密成功！');
         } catch (error) {
             updateStatus('解密失败：口令错误或密文已损坏');
@@ -372,5 +407,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // 过程展示相关函数
+    function showProcessSection() {
+        document.getElementById('processSection').style.display = 'block';
+    }
+
+    function hideProcessSection() {
+        document.getElementById('processSection').style.display = 'none';
+    }
+
+    function clearProcessSteps() {
+        document.getElementById('processSteps').innerHTML = '';
+    }
+
+    function addProcessStep(title, detail, type = 'info') {
+        const stepsDiv = document.getElementById('processSteps');
+        const stepDiv = document.createElement('div');
+        stepDiv.className = `process-step ${type}`;
+        
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'step-title';
+        titleDiv.textContent = title;
+        
+        const detailDiv = document.createElement('div');
+        detailDiv.className = 'step-detail';
+        detailDiv.textContent = detail;
+        
+        stepDiv.appendChild(titleDiv);
+        if (detail) stepDiv.appendChild(detailDiv);
+        stepsDiv.appendChild(stepDiv);
+        
+        // 自动滚动到底部
+        stepsDiv.scrollTop = stepsDiv.scrollHeight;
+    }
+
+    function formatBytes(bytes, maxLen = 32) {
+        const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+        return hex.length > maxLen ? hex.substring(0, maxLen) + '...' : hex;
     }
 });

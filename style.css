@@ -102,3 +102,50 @@ body {
   margin-top: 20px;
   font-size: 0.9em;
 }
+
+.process-steps {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.8;
+  background: #f5f5f5;
+  padding: 15px;
+  border-radius: 4px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.process-step {
+  margin: 8px 0;
+  padding: 8px;
+  background: white;
+  border-left: 3px solid #007bff;
+  border-radius: 3px;
+}
+
+.process-step.success {
+  border-left-color: #28a745;
+}
+
+.process-step.error {
+  border-left-color: #dc3545;
+}
+
+.process-step .step-title {
+  font-weight: bold;
+  color: #007bff;
+  margin-bottom: 4px;
+}
+
+.process-step.success .step-title {
+  color: #28a745;
+}
+
+.process-step.error .step-title {
+  color: #dc3545;
+}
+
+.process-step .step-detail {
+  color: #666;
+  font-size: 12px;
+  word-break: break-all;
+}
