@@ -245,6 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.cipherOut.value = encoded;
             updateStatus('加密成功！');
         } catch (error) {
+            addProcessStep('✗ 错误', error.message, 'error');
             updateStatus(`加密失败：${error.message}`);
             console.error('Encryption error:', error);
         }
@@ -298,21 +299,31 @@ document.addEventListener('DOMContentLoaded', () => {
             addProcessStep('✓ 密钥派生完成', `256位密钥已生成`, 'success');
             
             addProcessStep('🔓 步骤 5: AES-GCM 解密', `使用密钥和IV解密数据...`);
-            const decrypted = await crypto.subtle.decrypt(
-                { name: 'AES-GCM', iv },
-                key,
-                encrypted
-            );
-            addProcessStep('✓ 解密完成', `明文长度: ${decrypted.byteLength} 字节`, 'success');
+            let decrypted;
+            try {
+                decrypted = await crypto.subtle.decrypt(
+                    { name: 'AES-GCM', iv },
+                    key,
+                    encrypted
+                );
+                addProcessStep('✓ 解密完成', `明文长度: ${decrypted.byteLength} 字节`, 'success');
+            } catch (decryptError) {
+                addProcessStep('✗ 解密失败', `口令错误！AES-GCM解密失败，请检查口令是否正确。`, 'error');
+                throw new Error('口令错误或密文已损坏');
+            }
 
             // 转换为文本
+            addProcessStep('📄 步骤 6: 转换文本', `UTF-8解码中...`);
             const plainText = DECODER.decode(decrypted);
-            addProcessStep('📄 步骤 6: 转换文本', `UTF-8解码: ${plainText.length} 个字符`, 'success');
+            addProcessStep('✓ 转换完成', `${plainText.length} 个字符`, 'success');
             
             elements.plainOut.value = plainText;
             updateStatus('解密成功！');
         } catch (error) {
-            updateStatus('解密失败：口令错误或密文已损坏');
+            if (!error.message.includes('口令错误')) {
+                addProcessStep('✗ 错误', error.message, 'error');
+            }
+            updateStatus(`解密失败：${error.message}`);
             console.error('Decryption error:', error);
         }
     }
