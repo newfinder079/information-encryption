@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>魑魅魍魉加密</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>魑魅魍魉加密</h1>
+    </header>
+
+    <section class="grid">
+      <article class="card">
+        <h2>加密</h2>
+        <label for="plainIn" class="label">明文</label>
+        <textarea id="plainIn" class="textarea" rows="7" placeholder="输入要加密的文本（支持多行）"></textarea>
+
+        <div class="row">
+          <div class="col">
+            <label for="passEnc" class="label">口令</label>
+            <input id="passEnc" class="input" type="password" placeholder="输入口令" />
+          </div>
+          <div class="col small">
+            <label for="iterations" class="label">PBKDF2 迭代次数</label>
+            <input id="iterations" class="input" type="number" min="10000" step="10000" value="200000" />
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="btnEncrypt" class="btn primary">加密 →</button>
+          <button id="btnEncClear" class="btn">清空</button>
+        </div>
+
+        <label for="cipherOut" class="label">密文</label>
+        <textarea id="cipherOut" class="textarea mono" rows="7" readonly placeholder="加密结果会显示在这里"></textarea>
+
+        <div class="actions">
+          <button id="btnCopyCipher" class="btn">复制密文</button>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>解密</h2>
+        <label for="cipherIn" class="label">密文</label>
+        <textarea id="cipherIn" class="textarea mono" rows="7" placeholder="粘贴密文"></textarea>
+
+        <label for="passDec" class="label">口令</label>
+        <input id="passDec" class="input" type="password" placeholder="输入口令" />
+
+        <div class="actions">
+          <button id="btnDecrypt" class="btn primary">解密 →</button>
+          <button id="btnDecClear" class="btn">清空</button>
+        </div>
+
+        <label for="plainOut" class="label">明文</label>
+        <textarea id="plainOut" class="textarea" rows="7" readonly placeholder="解密结果会显示在这里"></textarea>
+      </article>
+    </section>
+
+    <section class="card">
+      <h2>状态 / 自检</h2>
+      <div id="status" class="status">准备就绪。</div>
+      <div class="actions">
+        <button id="btnSelfTest" class="btn">运行自检（加密后再解密）</button>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <small>本页面不联网即可工作；请自行妥善保管口令。</small>
+    </footer>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
