@@ -152,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 加密
     async function encrypt() {
-        const plainText = elements.plainIn.value.trim();
+        const plainText = elements.plainIn.value;
         const password = elements.passEnc.value;
         const iterations = parseInt(elements.iterations.value, 10);
 
@@ -305,10 +305,21 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // 验证结果
             const decryptedText = elements.plainOut.value;
+            console.log('原始文本:', JSON.stringify(testText));
+            console.log('解密文本:', JSON.stringify(decryptedText));
+            console.log('长度对比:', testText.length, 'vs', decryptedText.length);
+            console.log('是否相等:', decryptedText === testText);
+            
             if (decryptedText === testText) {
                 updateStatus('✓ 自检通过！加密和解密功能正常工作。');
             } else {
                 updateStatus('✗ 自检失败：解密结果与原文不匹配');
+                console.error('字符对比:');
+                for (let i = 0; i < Math.max(testText.length, decryptedText.length); i++) {
+                    if (testText[i] !== decryptedText[i]) {
+                        console.error(`位置${i}: 期望 "${testText[i]}" (${testText.charCodeAt(i)}), 实际 "${decryptedText[i]}" (${decryptedText.charCodeAt(i)})`);
+                    }
+                }
             }
         } catch (error) {
             updateStatus(`自检失败：${error.message}`);
