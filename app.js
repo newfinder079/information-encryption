@@ -94,10 +94,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function encodeCustom(uint8Array) {
         const chars = [];
         const len = uint8Array.length;
-        const padding = (3 - (len % 3)) % 3;  // 计算需要填充的字节数（0, 1, 或 2）
-        
-        // 在开头添加填充信息（使用前3个字符表示0, 1, 2）
-        chars.push(CHAR_MAP[padding]);
         
         let i = 0;
         // 每3个字节编码为4个字符
@@ -114,7 +110,9 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         }
         
-        return chars.join('');
+        // 添加填充标记（根据原始长度）
+        const padding = len % 3;
+        return chars.join('') + CHAR_MAP[padding];
     }
 
     function decodeCustom(str) {
@@ -125,13 +123,13 @@ document.addEventListener('DOMContentLoaded', () => {
             throw new Error('密文为空');
         }
         
-        // 读取填充信息
-        const padding = REVERSE_MAP[cleanStr[0]];
+        // 读取填充标记（最后一个字符）
+        const padding = REVERSE_MAP[cleanStr[cleanStr.length - 1]];
         if (padding > 2) {
             throw new Error('密文格式错误');
         }
         
-        const dataStr = cleanStr.slice(1);  // 去除填充标记
+        const dataStr = cleanStr.slice(0, -1);  // 去除填充标记
         
         if (dataStr.length % 4 !== 0) {
             throw new Error('密文长度无效');
@@ -153,9 +151,16 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         }
         
-        // 去除填充的字节
+        // 根据填充标记截取正确长度
         const result = new Uint8Array(bytes);
-        return padding > 0 ? result.slice(0, -padding) : result;
+        if (padding === 0) {
+            return result;
+        } else {
+            // padding=1表示原始长度%3=1，需要保留...+1个字节
+            // padding=2表示原始长度%3=2，需要保留...+2个字节
+            const correctLength = Math.floor(result.length / 3) * 3 + padding;
+            return result.slice(0, correctLength);
+        }
     }
 
     // 密钥派生
@@ -202,48 +207,53 @@ document.addEventListener('DOMContentLoaded', () => {
             // 显示过程
             showProcessSection();
             clearProcessSteps();
-            addProcessStep('📝 步骤 1: 读取输入', `明文长度: ${plainText.length} 字符\n迭代次数: ${iterations.toLocaleString()}`);
+            
+            const plainBytes = ENCODER.encode(plainText);
+            addProcessStep('📝 步骤 1: 读取输入', `明文: ${plainText.length} 字符 (${plainBytes.length} 字节)\n迭代次数: ${iterations.toLocaleString()}`);
             
             // 生成随机盐和IV
+            addProcessStep('🎲 步骤 2: 生成随机数', `生成盐值和初始化向量...`);
             const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
-            addProcessStep('🎲 步骤 2: 生成随机盐', `盐值 (16字节): ${formatBytes(salt)}`);
-            
             const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
-            addProcessStep('🎲 步骤 3: 生成初始化向量', `IV (12字节): ${formatBytes(iv)}`);
+            addProcessStep('✓ 随机数生成完成', `盐值: ${formatBytes(salt)}\nIV: ${formatBytes(iv)}`, 'success');
 
-            // 派生密钥并加密
-            addProcessStep('🔑 步骤 4: 密钥派生', `使用 PBKDF2-SHA256 从口令派生 AES-256 密钥...`);
+            // 派生密钥
+            addProcessStep('🔑 步骤 3: 密钥派生', `使用 PBKDF2-SHA256 (${iterations.toLocaleString()} 次迭代)...`);
             const key = await deriveKey(password, salt, iterations);
-            addProcessStep('✓ 密钥派生完成', `256位密钥已生成`, 'success');
+            addProcessStep('✓ 密钥派生完成', `AES-256 密钥已生成`, 'success');
             
-            addProcessStep('🔐 步骤 5: AES-GCM 加密', `使用 AES-256-GCM 加密数据...`);
+            // 加密数据
+            addProcessStep('🔐 步骤 4: AES-GCM 加密', `加密 ${plainBytes.length} 字节数据...`);
             const encrypted = await crypto.subtle.encrypt(
                 { name: 'AES-GCM', iv },
                 key,
-                ENCODER.encode(plainText)
+                plainBytes
             );
-            addProcessStep('✓ 加密完成', `密文长度: ${encrypted.byteLength} 字节`, 'success');
+            addProcessStep('✓ 加密完成', `密文: ${encrypted.byteLength} 字节`, 'success');
 
             // 组合数据：迭代次数(4) + 盐(16) + IV(12) + 密文
-            const totalLength = ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH + encrypted.byteLength;
-            const result = new Uint8Array(totalLength);
+            addProcessStep('📦 步骤 5: 组合数据', `打包所有组件...`);
+            const result = new Uint8Array(ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH + encrypted.byteLength);
             const view = new DataView(result.buffer);
             
-            view.setUint32(0, iterations, false);
-            result.set(salt, ITERATIONS_BYTES);
-            result.set(iv, ITERATIONS_BYTES + SALT_LENGTH);
-            result.set(new Uint8Array(encrypted), ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH);
+            let offset = 0;
+            view.setUint32(offset, iterations, false);
+            offset += ITERATIONS_BYTES;
+            result.set(salt, offset);
+            offset += SALT_LENGTH;
+            result.set(iv, offset);
+            offset += IV_LENGTH;
+            result.set(new Uint8Array(encrypted), offset);
             
-            addProcessStep('📦 步骤 6: 组合数据', `迭代次数(4) + 盐(16) + IV(12) + 密文(${encrypted.byteLength})\n总计: ${totalLength} 字节`);
+            addProcessStep('✓ 数据组合完成', `总计: ${result.length} 字节`, 'success');
 
             // 转换为自定义字符集
-            addProcessStep('🔤 步骤 7: Base64编码', `将二进制数据编码为64个神兽汉字...`);
+            addProcessStep('🔤 步骤 6: 编码', `Base64编码为神兽汉字...`);
             const encoded = encodeCustom(result);
-            console.log('加密完成，原始数据长度:', result.length, '编码后长度:', encoded.length);
-            addProcessStep('✓ 编码完成', `最终密文长度: ${encoded.length} 个字符`, 'success');
+            addProcessStep('✓ 编码完成', `最终密文: ${encoded.length} 个字符`, 'success');
             
             elements.cipherOut.value = encoded;
-            updateStatus('加密成功！');
+            updateStatus('✓ 加密成功！');
         } catch (error) {
             addProcessStep('✗ 错误', error.message, 'error');
             updateStatus(`加密失败：${error.message}`);
@@ -267,13 +277,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // 显示过程
             showProcessSection();
             clearProcessSteps();
-            addProcessStep('📝 步骤 1: 读取密文', `密文长度: ${cipherText.length} 个字符`);
+            addProcessStep('📝 步骤 1: 读取密文', `密文: ${cipherText.length} 个字符`);
             
             // 解码自定义字符集
-            console.log('开始解密，密文长度:', cipherText.length);
-            addProcessStep('🔤 步骤 2: Base64解码', `将神兽汉字解码为二进制数据...`);
+            addProcessStep('🔤 步骤 2: 解码', `将神兽汉字解码为二进制...`);
             const data = decodeCustom(cipherText);
-            console.log('解码后数据长度:', data.length);
             addProcessStep('✓ 解码完成', `二进制数据: ${data.length} 字节`, 'success');
             
             // 检查数据长度
@@ -283,22 +291,30 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // 提取数据
-            addProcessStep('📦 步骤 3: 提取数据', `分离迭代次数、盐值、IV和密文...`);
-            const view = new DataView(data.buffer);
-            const iterations = view.getUint32(0, false);
-            const salt = data.slice(ITERATIONS_BYTES, ITERATIONS_BYTES + SALT_LENGTH);
-            const iv = data.slice(ITERATIONS_BYTES + SALT_LENGTH, ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH);
-            const encrypted = data.slice(ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH);
+            addProcessStep('📦 步骤 3: 提取数据', `分离各个组件...`);
+            const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
             
-            console.log('迭代次数:', iterations, '盐长度:', salt.length, 'IV长度:', iv.length, '密文长度:', encrypted.length);
+            let offset = 0;
+            const iterations = view.getUint32(offset, false);
+            offset += ITERATIONS_BYTES;
+            
+            const salt = data.slice(offset, offset + SALT_LENGTH);
+            offset += SALT_LENGTH;
+            
+            const iv = data.slice(offset, offset + IV_LENGTH);
+            offset += IV_LENGTH;
+            
+            const encrypted = data.slice(offset);
+            
             addProcessStep('✓ 数据提取完成', `迭代: ${iterations.toLocaleString()}\n盐: ${formatBytes(salt, 24)}\nIV: ${formatBytes(iv, 24)}\n密文: ${encrypted.length} 字节`, 'success');
 
-            // 派生密钥并解密
-            addProcessStep('🔑 步骤 4: 密钥派生', `使用 PBKDF2-SHA256 从口令派生密钥...`);
+            // 派生密钥
+            addProcessStep('🔑 步骤 4: 密钥派生', `使用 PBKDF2-SHA256 (${iterations.toLocaleString()} 次迭代)...`);
             const key = await deriveKey(password, salt, iterations);
-            addProcessStep('✓ 密钥派生完成', `256位密钥已生成`, 'success');
+            addProcessStep('✓ 密钥派生完成', `AES-256 密钥已生成`, 'success');
             
-            addProcessStep('🔓 步骤 5: AES-GCM 解密', `使用密钥和IV解密数据...`);
+            // 解密
+            addProcessStep('🔓 步骤 5: AES-GCM 解密', `解密 ${encrypted.length} 字节数据...`);
             let decrypted;
             try {
                 decrypted = await crypto.subtle.decrypt(
@@ -306,21 +322,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     key,
                     encrypted
                 );
-                addProcessStep('✓ 解密完成', `明文长度: ${decrypted.byteLength} 字节`, 'success');
+                addProcessStep('✓ 解密完成', `明文: ${decrypted.byteLength} 字节`, 'success');
             } catch (decryptError) {
-                addProcessStep('✗ 解密失败', `口令错误！AES-GCM解密失败，请检查口令是否正确。`, 'error');
-                throw new Error('口令错误或密文已损坏');
+                addProcessStep('✗ 解密失败', `口令错误！无法通过AES-GCM验证。`, 'error');
+                throw new Error('口令错误');
             }
 
             // 转换为文本
-            addProcessStep('📄 步骤 6: 转换文本', `UTF-8解码中...`);
+            addProcessStep('📄 步骤 6: 文本解码', `UTF-8解码...`);
             const plainText = DECODER.decode(decrypted);
-            addProcessStep('✓ 转换完成', `${plainText.length} 个字符`, 'success');
+            addProcessStep('✓ 解码完成', `${plainText.length} 个字符`, 'success');
             
             elements.plainOut.value = plainText;
-            updateStatus('解密成功！');
+            updateStatus('✓ 解密成功！');
         } catch (error) {
-            if (!error.message.includes('口令错误')) {
+            if (!error.message.includes('口令错误') && !error.message.includes('密文')) {
                 addProcessStep('✗ 错误', error.message, 'error');
             }
             updateStatus(`解密失败：${error.message}`);
