@@ -190,7 +190,9 @@ document.addEventListener('DOMContentLoaded', () => {
             result.set(new Uint8Array(encrypted), ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH);
 
             // 转换为自定义字符集
-            elements.cipherOut.value = encodeCustom(result);
+            const encoded = encodeCustom(result);
+            console.log('加密完成，原始数据长度:', result.length, '编码后长度:', encoded.length);
+            elements.cipherOut.value = encoded;
             updateStatus('加密成功！');
         } catch (error) {
             updateStatus(`加密失败：${error.message}`);
@@ -212,7 +214,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             // 解码自定义字符集
+            console.log('开始解密，密文长度:', cipherText.length);
             const data = decodeCustom(cipherText);
+            console.log('解码后数据长度:', data.length);
             
             // 检查数据长度
             const minLength = ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH;
@@ -226,6 +230,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const salt = data.slice(ITERATIONS_BYTES, ITERATIONS_BYTES + SALT_LENGTH);
             const iv = data.slice(ITERATIONS_BYTES + SALT_LENGTH, ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH);
             const encrypted = data.slice(ITERATIONS_BYTES + SALT_LENGTH + IV_LENGTH);
+            
+            console.log('迭代次数:', iterations, '盐长度:', salt.length, 'IV长度:', iv.length, '密文长度:', encrypted.length);
 
             // 派生密钥并解密
             const key = await deriveKey(password, salt, iterations);
