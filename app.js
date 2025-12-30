@@ -337,19 +337,25 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // 验证结果
             const decryptedText = elements.plainOut.value;
+            // 规范化换行符进行比较（Windows下textarea可能使用\r\n）
+            const normalizedTest = testText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            const normalizedDecrypted = decryptedText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            
             console.log('原始文本:', JSON.stringify(testText));
             console.log('解密文本:', JSON.stringify(decryptedText));
-            console.log('长度对比:', testText.length, 'vs', decryptedText.length);
-            console.log('是否相等:', decryptedText === testText);
+            console.log('规范化后原始:', JSON.stringify(normalizedTest));
+            console.log('规范化后解密:', JSON.stringify(normalizedDecrypted));
+            console.log('长度对比:', normalizedTest.length, 'vs', normalizedDecrypted.length);
+            console.log('是否相等:', normalizedDecrypted === normalizedTest);
             
-            if (decryptedText === testText) {
+            if (normalizedDecrypted === normalizedTest) {
                 updateStatus('✓ 自检通过！加密和解密功能正常工作。');
             } else {
                 updateStatus('✗ 自检失败：解密结果与原文不匹配');
                 console.error('字符对比:');
-                for (let i = 0; i < Math.max(testText.length, decryptedText.length); i++) {
-                    if (testText[i] !== decryptedText[i]) {
-                        console.error(`位置${i}: 期望 "${testText[i]}" (${testText.charCodeAt(i)}), 实际 "${decryptedText[i]}" (${decryptedText.charCodeAt(i)})`);
+                for (let i = 0; i < Math.max(normalizedTest.length, normalizedDecrypted.length); i++) {
+                    if (normalizedTest[i] !== normalizedDecrypted[i]) {
+                        console.error(`位置${i}: 期望 "${normalizedTest[i]}" (${normalizedTest.charCodeAt(i)}), 实际 "${normalizedDecrypted[i]}" (${normalizedDecrypted.charCodeAt(i)})`);
                     }
                 }
             }
