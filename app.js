@@ -58,6 +58,38 @@ document.addEventListener('DOMContentLoaded', () => {
         selfTest();
     });
 
+    // 测试编码解码是否正确
+    function testEncodeDecode() {
+        console.log('=== 测试编码解码 ===');
+        const testData = new Uint8Array([1, 2, 3, 4, 5, 10, 20, 30, 40, 50, 100, 150, 200, 250, 255]);
+        console.log('原始数据:', Array.from(testData));
+        
+        const encoded = encodeCustom(testData);
+        console.log('编码结果:', encoded, '长度:', encoded.length);
+        
+        const decoded = decodeCustom(encoded);
+        console.log('解码结果:', Array.from(decoded));
+        
+        let match = testData.length === decoded.length;
+        if (match) {
+            for (let i = 0; i < testData.length; i++) {
+                if (testData[i] !== decoded[i]) {
+                    match = false;
+                    console.error('不匹配位置:', i, '期望:', testData[i], '实际:', decoded[i]);
+                    break;
+                }
+            }
+        } else {
+            console.error('长度不匹配:', testData.length, 'vs', decoded.length);
+        }
+        
+        console.log('编码解码测试:', match ? '通过' : '失败');
+        return match;
+    }
+    
+    // 运行测试
+    testEncodeDecode();
+
     // 自定义字符编码 (Base64)
     function encodeCustom(uint8Array) {
         const chars = [];
